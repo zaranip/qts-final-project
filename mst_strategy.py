@@ -269,9 +269,9 @@ def generate_trading_signals(
 
 def compute_lambda_scale(
     lambda_series: pd.Series,
-    mode: str = "small_only",   # "small_only", "large_only", "two_sided", "none"
+    mode: str = "large_only",   # "small_only", "large_only", "two_sided", "none"
     min_periods: int = 20,
-    z_threshold: float = 2.0,
+    z_threshold: float = 2.75,
     shrink_small: float = 0.5,
     shrink_large: float = 0.5,
 ) -> pd.DataFrame:
@@ -357,9 +357,9 @@ def compute_pair_weights(
     leader_window: int = 20,
     max_pair_weight: float = 1.5,
     max_gross_leverage: float = 4.0,
-    lambda_risk_mode: str = "small_only",   # NEW
+    lambda_risk_mode: str = "large_only",   # NEW
     lambda_min_periods: int = 20,           # NEW
-    lambda_z_threshold: float = 2.0,        # NEW
+    lambda_z_threshold: float = 2.75,        # NEW
     lambda_shrink_small: float = 0.5,       # NEW
     lambda_shrink_large: float = 0.5,       # NEW
 ) -> Dict[str, Dict[pd.Timestamp, pd.Series] | pd.Series]:

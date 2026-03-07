@@ -362,6 +362,10 @@ def compute_pair_weights(
     lambda_z_threshold: float = 2.75,        # NEW
     lambda_shrink_small: float = 0.5,       # NEW
     lambda_shrink_large: float = 0.5,       # NEW
+    z_threshold: Optional[float] = None,    # === NEW PARAM
+    shrink_small: Optional[float] = None,   # === NEW PARAM
+    shrink_large: Optional[float] = None,   # === NEW PARAM
+    use_mst_edges_only: bool = True,        # === NEW PARAM
 ) -> Dict[str, Dict[pd.Timestamp, pd.Series] | pd.Series]:
     """Compute pair and aggregate asset weights using volatility-targeted sizing.
 
@@ -394,13 +398,19 @@ def compute_pair_weights(
         )
     else:
         lambda_series = fiedler_values.reindex(dates).astype(float)
+        # === MODIFIED
+        effective_z_threshold = lambda_z_threshold if z_threshold is None else z_threshold
+        # === MODIFIED
+        effective_shrink_small = lambda_shrink_small if shrink_small is None else shrink_small
+        # === MODIFIED
+        effective_shrink_large = lambda_shrink_large if shrink_large is None else shrink_large
         lambda_diag = compute_lambda_scale(
             lambda_series=lambda_series,
             mode=lambda_risk_mode,
             min_periods=lambda_min_periods,
-            z_threshold=lambda_z_threshold,
-            shrink_small=lambda_shrink_small,
-            shrink_large=lambda_shrink_large,
+            z_threshold=effective_z_threshold,     # === MODIFIED
+            shrink_small=effective_shrink_small,   # === MODIFIED
+            shrink_large=effective_shrink_large,   # === MODIFIED
         )
 
     lambda_scale = lambda_diag["scale"].reindex(dates).fillna(1.0)
@@ -432,7 +442,7 @@ def compute_pair_weights(
         for i in assets:
             for j in assets:
                 if i < j:
-                    if allowed_pairs is not None and (i, j) not in allowed_pairs:
+                    if use_mst_edges_only and allowed_pairs is not None and (i, j) not in allowed_pairs:  # === MODIFIED
                         continue
                     s = float(sig.loc[i, j])
                     if np.isfinite(s):
@@ -672,3 +682,44 @@ def run_weekly_mst_pipeline(
         "fiedler_values": fiedler_series,
         "signals": signals,
     }
+
+
+# === NEW PARAM
+def run_strategy_with_params(
+    prices: pd.DataFrame,
+    params: Optional[Dict[str, object]] = None,
+) -> Dict[str, Dict[pd.Timestamp, pd.Series] | pd.Series]:
+    # === MODIFIED
+    cfg = params or {}
+
+    # === MODIFIED
+    pipeline = run_weekly_mst_pipeline(
+        prices=prices,
+        corr_window=int(cfg.get("corr_window", 252)),                  # === NEW PARAM
+        resistance_lookback=int(cfg.get("resistance_lookback", 60)),   # === NEW PARAM
+    )
+
+    # === MODIFIED
+    weights = compute_pair_weights(
+        signals=cast(Dict[pd.Timestamp, pd.DataFrame], pipeline["signals"]),
+        returns=cast(pd.DataFrame, pipeline["returns"]),
+        fiedler_values=cast(pd.Series, pipeline["fiedler_values"]),
+        mst_by_date=cast(Dict[pd.Timestamp, List[Edge]], pipeline["mst_by_date"]),
+        asset_names=[str(c) for c in prices.columns],
+        sigma_target=float(cfg.get("sigma_target", 0.10)),                    # === NEW PARAM
+        max_pairs=int(cfg.get("max_pairs", 15)),                               # === NEW PARAM
+        beta_window=int(cfg.get("beta_window", 60)),                           # === NEW PARAM
+        leader_window=int(cfg.get("leader_window", 20)),                       # === NEW PARAM
+        max_pair_weight=float(cfg.get("max_pair_weight", 1.5)),                # === NEW PARAM
+        max_gross_leverage=float(cfg.get("max_gross_leverage", 4.0)),          # === NEW PARAM
+        lambda_risk_mode=str(cfg.get("lambda_risk_mode", "large_only")),       # === NEW PARAM
+        lambda_min_periods=int(cfg.get("lambda_min_periods", 20)),             # === NEW PARAM
+        lambda_z_threshold=float(cfg.get("lambda_z_threshold", 2.75)),         # === NEW PARAM
+        lambda_shrink_small=float(cfg.get("lambda_shrink_small", 0.5)),        # === NEW PARAM
+        lambda_shrink_large=float(cfg.get("lambda_shrink_large", 0.5)),        # === NEW PARAM
+        z_threshold=cast(Optional[float], cfg.get("z_threshold")),             # === NEW PARAM
+        shrink_small=cast(Optional[float], cfg.get("shrink_small")),           # === NEW PARAM
+        shrink_large=cast(Optional[float], cfg.get("shrink_large")),           # === NEW PARAM
+        use_mst_edges_only=bool(cfg.get("use_mst_edges_only", True)),          # === NEW PARAM
+    )
+    return weights

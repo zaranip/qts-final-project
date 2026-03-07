@@ -457,6 +457,7 @@ def compute_pair_weights(
         pair_vals: Dict[Tuple[str, str], float] = {}
         asset_w = pd.Series(0.0, index=assets)
         for (a, b), signal in chosen:
+
             ra = hist_beta[a].dropna()
             rb = hist_beta[b].dropna()
             joined = pd.concat([ra, rb], axis=1, join="inner").dropna()
@@ -468,7 +469,7 @@ def compute_pair_weights(
                 continue
             beta = float(np.cov(joined.iloc[:, 0].values, joined.iloc[:, 1].values, ddof=1)[0, 1] / beta_denom)
 
-            spread = joined.iloc[:, 0] - beta * joined.iloc[:, 1]
+            spread = joined.iloc[:, 0] - joined.iloc[:, 1]
             sigma_ij = float(spread.std(ddof=1) * np.sqrt(252.0))
             # Floor spread vol to prevent weight explosion when pairs co-move perfectly
             sigma_ij = max(sigma_ij, 0.01)
